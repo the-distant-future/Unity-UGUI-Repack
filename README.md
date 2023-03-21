@@ -13,6 +13,7 @@
     using CMKZ;
     using static CMKZ.LocalStorage;
 ## 矩形
+### 基本用法
     GameObject A = MainPanel.创建矩形("0 0 100 100").SetColor(128,128,128).SetText("测试");
 现在，忘掉Unity的Canvas结构。想象这样的设定：  
 Unity中自带一个名为MainPanel的透明矩形，全屏。  
@@ -28,11 +29,16 @@ SetColor与SetText都是return this。即，A是【创建矩形】的结果。
 
     GameObject A = MainPanel.创建矩形("20+10% 40%-20 50% -100+5%").SetColor(128,128,128).SetText("测试");
 百分比表示父物体宽度（高度）的百分比。左宽对应宽度，上高对应高度。  
-如果要嵌套矩形，只需要这样做：  
-
+### 嵌套矩形
     GameObject A = MainPanel.创建矩形("0 0 100 100").SetColor(128,128,128);
     GameObject B = A.创建矩形("20 20 40 40").SetColor(255,128,128).SetText("测试");
 注：可以不SetColor。此处SetColor只是为了便于观察。  
+### 其他函数
+    A.AddText("XX");
+    string X = A.GetText();
+    A.SetEditable(true);//允许编辑。即，A变为输入框
+    A.SetEditable(flase);//不允许编辑。可以用于双击重命名时，点击外界后进入不允许编辑状态
+    TMP_InputField X = A.GetInputComponent();//用于添加OnValueChange之类的东西
 ## 布局
 ### 垂直布局
 最简用法：
@@ -112,14 +118,81 @@ JSON定义为一个string到JSON的字典，在for与foreach时它的用法与�
     LoadAddTab();
 存档以Title为识别，因此两个面板不要有相同的Title。  
 存档只保存Title的布局关系，不保存面板内容。读档时需要先创建面板，再读档，读档只修改面板的布局。  
-读档时允许当前界面中缺少或多余面板。只处理当前界面与存档中都有的面板。  
+读档时允许当前界面中缺少或多余面板。只处理当前界面与存档中都有的面板。    
+## 流程
+### 时刻执行
+常规的时刻执行：  
+
+    AddUpdate(() => {
+        //时刻执行的内容
+        //用于函数式编程，在静态函数中添加时刻执行的操作。
+    });
+绑定某物体的时刻执行：
+
+    GameObject A;
+    A.AddUpdate(() => {
+        //时刻执行的内容。当物体A被销毁时，此内容也不再执行。
+        //OnOverText基于此而实现：时刻检测鼠标是否在物体上，如果在，那么创建注释面板。如果物体销毁，那么不再检测。
+    });
+    
+绑定标识符的时刻执行：
+
+    UpdateDo["标识符1"] = () => {
+        //时刻执行的内容。当此标识符被赋予新的事件时（或删除时），旧的事件不再执行。
+        //WaitFor基于此而实现。每次WaitFor都创建一个新的标识符、时刻执行监听。
+    }
+执行一次：
+
+    Do(() => {
+        //执行的内容
+        //本函数用于解决【多线程时，子线程无法操作UGUI】的bug。在子线程中操作UGUI时，可以使用Do。
+    });
+### 等到X时执行
+WaitFor有很多应用，例如前面介绍过的数据改动时布局自动刷新，再例如双击重命名：  
+
+    var A = MainPanel.创建矩形("0 0 100 100");
+    A.OnDoubleClick(() => {
+        A.SetEditable(true);
+        WaitFor(() => Input.OnMouseButtonDown(0) && !A.IsMouseHere()).Then(() => {
+            A.SetEditable(false);
+        });
+    });
+游戏中可能会有技能延迟生效，也可以使用WaitFor。  
+如果战斗结束，那么还未生效的延迟技能需要被取消。此时可以使用ExitOn：  
+
+    int A = 当前回合;
+    WaitFor(() => 当前回合 > A + 延迟回合数).Then(() => {
+        //释放技能
+    }).ExitOn(() => 当前回合 == 0);//战斗结束后回合会自动归零。此处检测回合归零，然后让未生效的技能在战斗结束后退出WaitFor。
+### 其他函数
+    SetTimer(5,()=>{}).ExitOn(()=>{});//计划五秒后执行XX。如果五秒内出现XXX，那么取消计划。
+    执行X次(5,i=>{});//对For的简化。等价于for(int i=0;i<5;i++){}
+    A.ForEach(t=>{});//A是一个数组或列表。是对Foreach的简化，等价于foreach(var t in A){}
+## 文件
+### 存档读档
+    自定义类 X;
+    FileWrite("C:/XX.txt",X);
+    自定义类 A = FileRead<自定义类>("C:/XX.txt");
+第一，X可以是任何类型，自动JSON序列化存档。  
+第二，存档会被简单加密。  
+第三，X中只可以包含string,int等基本类型，以及基于基本类型而定义的高级类型（比如List）。不要包含GameObject、Sprite之类的东西。  
+第四，文件名任意，可以是txt后缀，也可以是其他后缀或者无后缀。  
+### 错误日志
+局部错误：
+
+    try{
+        //XX
+    }catch(e){
+        ErrorLog(e,"C:/Error.txt");
+    }
+全局错误：
+
+    CatchAllError("C:/AllError.txt");
+第一，输出的错误日志会包含【时间】【错误内容】【错误位置】。  
+第二，错误日志本质是对文件AddText，而不是Set。这导致日志会越积累越多，如果有大量错误日志，那么要定期清理。  
+第三，全局错误会自动捕获所有【未手动捕获】的异常。
 ## 功能
 //未完待续
-
-
-
-
-
 
 
 
